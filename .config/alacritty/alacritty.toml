@@ -1,0 +1,23 @@
+
+[font.normal]
+family = "SauceCodePro NFM SemiBold"
+
+[font.bold]
+family = "SauceCodePro NFM"
+style = "Bold"
+
+[font.italic]
+family = "SauceCodePro NFM SemiBold"
+style = "Italic"
+
+[font.bold_italic]
+family = "SauceCodePro NFM"
+style = "Bold Italic"
+
+[general]
+import = [
+  "~/.config/alacritty/catppuccin-mocha.toml"
+]
+
+[window]
+dynamic_padding = true
