@@ -7,6 +7,7 @@ alias 1440='xrandr --output eDP1 --mode 2560x1440'
 alias gs="git status"
 alias ga="git add "
 alias gcm="git commit -m "
+alias gp="git push "
 
 function y() {
 	local tmp="$(mktemp -t "yazi-cwd.XXXXXX")"
