@@ -7,6 +7,7 @@ vim.opt.mouse = "a"
 vim.opt.tabstop = 2
 vim.opt.shiftwidth = 2
 vim.opt.softtabstop = 2
+vim.opt.expandtab = true
 
 -- Don't show the mode, since it's already in the status line
 vim.opt.showmode = false
@@ -129,7 +130,7 @@ require("lazy").setup({
 			{ "<F11>", mode = { "t" }, "<C-\\><C-n><CMD>lua require('FTerm').toggle()<CR>" },
 		},
 	},
-	"tpope/vim-sleuth", -- Detect tabstop and shiftwidth automatically
+	-- "tpope/vim-sleuth", -- Detect tabstop and shiftwidth automatically
 
 	-- See `:help gitsigns` to understand what the configuration keys do
 	{ -- Adds git related signs to the gutter, as well as utilities for managing changes
