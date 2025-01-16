@@ -23,3 +23,6 @@
 !.config/zsh/powerlevel10k/
 .config/zsh/histfile
 .config/zsh/.zcompdump
+
+!.config/zellij/
+
