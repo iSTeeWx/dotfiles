@@ -292,7 +292,7 @@ require("lazy").setup {
         content = {
           active = function ()
             local diagnostics_signs = { ERROR = ' ', WARN = ' ', INFO = ' ', HINT = '* ' }
-            local mode, mode_hl = MiniStatusline.section_mode({ trunc_width = 10000 })
+            local mode, mode_hl = MiniStatusline.section_mode({ trunc_width = 100 })
             local git           = MiniStatusline.section_git({ trunc_width = 40 })
             local diff          = MiniStatusline.section_diff({ trunc_width = 75 })
             local diagnostics   = MiniStatusline.section_diagnostics({ trunc_width = 75, signs = diagnostics_signs })
