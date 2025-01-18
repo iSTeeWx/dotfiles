@@ -196,7 +196,7 @@ require("lazy").setup {
         function()
           Snacks.terminal.toggle "zsh"
         end,
-        desc = "term ?",
+        desc = "Floating terminal",
       },
     },
   },
