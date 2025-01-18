@@ -52,7 +52,7 @@ vim.opt.scrolloff = 10
 vim.keymap.set("n", "<Esc>", "<cmd>nohlsearch<CR>")
 
 -- Diagnostic keymaps
-vim.keymap.set("n", "<leader>q", vim.diagnostic.setloclist, { desc = "Open diagnostic [Q]uickfix list" })
+-- vim.keymap.set("n", "<leader>q", vim.diagnostic.setloclist, { desc = "Open diagnostic [Q]uickfix list" })
 
 vim.keymap.set("n", "<left>", '<cmd>echo "Use h to move!!"<CR>')
 vim.keymap.set("n", "<right>", '<cmd>echo "Use l to move!!"<CR>')
@@ -67,8 +67,6 @@ vim.keymap.set("n", "<C-k>", "<C-w><C-k>", { desc = "Move focus to the upper win
 vim.keymap.set("n", "H", "<cmd>bp<CR>", { desc = "Move focus to the previous buffer" })
 vim.keymap.set("n", "L", "<cmd>bn<CR>", { desc = "Move focus to the next buffer" })
 vim.keymap.set("n", "<leader>bd", "<cmd>bd<CR>", { desc = "Delete buffer" })
-
-vim.keymap.set("n", "<leader>e", "<cmd>Explore<CR>", { desc = "Opens file explorer" })
 
 vim.api.nvim_create_autocmd("TextYankPost", {
 	group = vim.api.nvim_create_augroup("kickstart-highlight-yank", { clear = true }),
@@ -88,6 +86,50 @@ vim.api.nvim_create_autocmd({ "FileType" }, {
 	end,
 })
 
+---@type table<number, {token:lsp.ProgressToken, msg:string, done:boolean}[]>
+local progress = vim.defaulttable()
+vim.api.nvim_create_autocmd("LspProgress", {
+  ---@param ev {data: {client_id: integer, params: lsp.ProgressParams}}
+  callback = function(ev)
+    local client = vim.lsp.get_client_by_id(ev.data.client_id)
+    local value = ev.data.params.value --[[@as {percentage?: number, title?: string, message?: string, kind: "begin" | "report" | "end"}]]
+    if not client or type(value) ~= "table" then
+      return
+    end
+    local p = progress[client.id]
+
+    for i = 1, #p + 1 do
+      if i == #p + 1 or p[i].token == ev.data.params.token then
+        p[i] = {
+          token = ev.data.params.token,
+          msg = ("[%3d%%] %s%s"):format(
+            value.kind == "end" and 100 or value.percentage or 100,
+            value.title or "",
+            value.message and (" **%s**"):format(value.message) or ""
+          ),
+          done = value.kind == "end",
+        }
+        break
+      end
+    end
+
+    local msg = {} ---@type string[]
+    progress[client.id] = vim.tbl_filter(function(v)
+      return table.insert(msg, v.msg) or not v.done
+    end, p)
+
+    local spinner = { "⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏" }
+    vim.notify(table.concat(msg, "\n"), "info", {
+      id = "lsp_progress",
+      title = client.name,
+      opts = function(notif)
+        notif.icon = #progress[client.id] == 0 and " "
+          or spinner[math.floor(vim.uv.hrtime() / (1e6 * 80)) % #spinner + 1]
+      end,
+    })
+  end,
+})
+
 local lazypath = vim.fn.stdpath("data") .. "/lazy/lazy.nvim"
 if not (vim.uv or vim.loop).fs_stat(lazypath) then
 	local lazyrepo = "https://github.com/folke/lazy.nvim.git"
@@ -101,31 +143,37 @@ vim.opt.rtp:prepend(lazypath)
 require("lazy").setup({
 	-- lazy.nvim
 	{
-		"sphamba/smear-cursor.nvim",
-		opts = {},
+		"folke/snacks.nvim",
+    priority = 1000,
+    lazy = false,
+		opts = {
+      picker = { },
+      terminal = { },
+      notifier = {
+        style = "compact",
+      },
+      notify = { },
+    },
+		keys = {
+			{ "<leader><space>", function() Snacks.picker.recent() end, desc = "Recent Files" },
+			{ "<leader>s", function() Snacks.picker.grep() end, desc = "Grep" },
+      { "<leader>q", function() Snacks.picker.diagnostics() end, desc = "Diagnostics" },
+      { "gd", function() Snacks.picker.lsp_definitions() end, desc = "[G]oto [D]efinition" },
+      { "gr", function() Snacks.picker.lsp_references() end, nowait = true, desc = "[G]oto [R]eferences" },
+      { "<F11>", mode = { "n", "t" }, function() Snacks.terminal.toggle("zsh") end, desc = "term ?" },
+		},
 	},
+	{ "sphamba/smear-cursor.nvim", opts = {}, },
 	{
 		"catppuccin/nvim",
 		name = "catppuccin",
-		priority = 1000,
-		init = function()
-			vim.cmd.colorscheme("catppuccin")
-		end,
+		init = function() vim.cmd.colorscheme("catppuccin") end,
 	},
 	{
 		"folke/noice.nvim",
 		event = "VeryLazy",
-		opts = {
-			-- add any options here
-		},
-		dependencies = {
-			-- if you lazy-load any plugin below, make sure to add proper `module="..."` entries
-			"MunifTanjim/nui.nvim",
-			-- OPTIONAL:
-			--   `nvim-notify` is only needed, if you want to use the notification view.
-			--   If not available, we use `mini` as the fallback
-			"rcarriga/nvim-notify",
-		},
+		opts = { lsp = { progress = { enabled = false, }, }, },
+		dependencies = { "MunifTanjim/nui.nvim", },
 	},
 	{
 		"nvim-lualine/lualine.nvim",
@@ -142,15 +190,7 @@ require("lazy").setup({
 		event = "InsertEnter",
 		config = true,
 	},
-	{
-		"numToStr/FTerm.nvim",
-		pin = true,
-		keys = {
-			{ "<F11>", mode = { "n" }, "<CMD>lua require('FTerm').toggle()<CR>" },
-			{ "<F11>", mode = { "t" }, "<C-\\><C-n><CMD>lua require('FTerm').toggle()<CR>" },
-		},
-	},
-	-- "tpope/vim-sleuth", -- Detect tabstop and shiftwidth automatically
+  -- "tpope/vim-sleuth", -- Detect tabstop and shiftwidth automatically
 
 	-- See `:help gitsigns` to understand what the configuration keys do
 	{ -- Adds git related signs to the gutter, as well as utilities for managing changes
@@ -201,105 +241,6 @@ require("lazy").setup({
 			},
 		},
 	},
-
-	{ -- Fuzzy Finder (files, lsp, etc)
-		"nvim-telescope/telescope.nvim",
-		event = "VimEnter",
-		branch = "0.1.x",
-		dependencies = {
-			"nvim-lua/plenary.nvim",
-			{ -- If encountering errors, see telescope-fzf-native README for installation instructions
-				"nvim-telescope/telescope-fzf-native.nvim",
-
-				-- `build` is used to run some command when the plugin is installed/updated.
-				-- This is only run then, not every time Neovim starts up.
-				build = "make",
-			},
-			{ "nvim-telescope/telescope-ui-select.nvim" },
-
-			-- Useful for getting pretty icons, but requires a Nerd Font.
-			{ "nvim-tree/nvim-web-devicons" },
-		},
-		config = function()
-			-- Telescope is a fuzzy finder that comes with a lot of different things that
-			-- it can fuzzy find! It's more than just a "file finder", it can search
-			-- many different aspects of Neovim, your workspace, LSP, and more!
-			--
-			-- The easiest way to use Telescope, is to start by doing something like:
-			--  :Telescope help_tags
-			--
-			-- After running this command, a window will open up and you're able to
-			-- type in the prompt window. You'll see a list of `help_tags` options and
-			-- a corresponding preview of the help.
-			--
-			-- Two important keymaps to use while in Telescope are:
-			--  - Insert mode: <c-/>
-			--  - Normal mode: ?
-			--
-			-- This opens a window that shows you all of the keymaps for the current
-			-- Telescope picker. This is really useful to discover what Telescope can
-			-- do as well as how to actually do it!
-
-			-- [[ Configure Telescope ]]
-			-- See `:help telescope` and `:help telescope.setup()`
-			require("telescope").setup({
-				-- You can put your default mappings / updates / etc. in here
-				--  All the info you're looking for is in `:help telescope.setup()`
-				--
-				-- defaults = {
-				--   mappings = {
-				--     i = { ['<c-enter>'] = 'to_fuzzy_refine' },
-				--   },
-				-- },
-				-- pickers = {}
-				extensions = {
-					["ui-select"] = {
-						require("telescope.themes").get_dropdown(),
-					},
-				},
-			})
-
-			-- Enable Telescope extensions if they are installed
-			pcall(require("telescope").load_extension, "fzf")
-			pcall(require("telescope").load_extension, "ui-select")
-
-			-- See `:help telescope.builtin`
-			local builtin = require("telescope.builtin")
-			-- vim.keymap.set("n", "<leader>sh", builtin.help_tags, { desc = "[S]earch [H]elp" })
-			-- vim.keymap.set("n", "<leader>sk", builtin.keymaps, { desc = "[S]earch [K]eymaps" })
-			vim.keymap.set("n", "<leader>sf", builtin.find_files, { desc = "[S]earch [F]iles" })
-			-- vim.keymap.set("n", "<leader>ss", builtin.builtin, { desc = "[S]earch [S]elect Telescope" })
-			-- vim.keymap.set("n", "<leader>sw", builtin.grep_string, { desc = "[S]earch current [W]ord" })
-			vim.keymap.set("n", "<leader>sg", builtin.live_grep, { desc = "[S]earch by [G]rep" })
-			vim.keymap.set("n", "<leader>sd", builtin.diagnostics, { desc = "[S]earch [D]iagnostics" })
-			-- vim.keymap.set("n", "<leader>sr", builtin.resume, { desc = "[S]earch [R]esume" })
-			vim.keymap.set(
-				"n",
-				"<leader><leader>",
-				builtin.oldfiles,
-				{ desc = '[S]earch Recent Files ("." for repeat)' }
-			)
-			-- vim.keymap.set("n", "<leader><leader>", builtin.buffers, { desc = "[ ] Find existing buffers" })
-
-			-- Slightly advanced example of overriding default behavior and theme
-			vim.keymap.set(
-				"n",
-				"<leader>/",
-				builtin.current_buffer_fuzzy_find,
-				{ desc = "[/] Fuzzily search in current buffer" }
-			)
-
-			-- It's also possible to pass additional configuration options.
-			--  See `:help telescope.builtin.live_grep()` for information about particular keys
-			vim.keymap.set("n", "<leader>s/", function()
-				builtin.live_grep({
-					grep_open_files = true,
-					prompt_title = "Live Grep in Open Files",
-				})
-			end, { desc = "[S]earch [/] in Open Files" })
-		end,
-	},
-
 	-- LSP Plugins
 	{
 		"folke/lazydev.nvim",
@@ -320,11 +261,6 @@ require("lazy").setup({
 			{ "williamboman/mason.nvim", config = true }, -- NOTE: Must be loaded before dependants
 			"williamboman/mason-lspconfig.nvim",
 			"WhoIsSethDaniel/mason-tool-installer.nvim",
-
-			-- Useful status updates for LSP.
-			-- NOTE: `opts = {}` is the same as calling `require('fidget').setup({})`
-			{ "j-hui/fidget.nvim", opts = {} },
-
 			-- Allows extra capabilities provided by nvim-cmp
 			"hrsh7th/cmp-nvim-lsp",
 		},
@@ -345,35 +281,6 @@ require("lazy").setup({
 						mode = mode or "n"
 						vim.keymap.set(mode, keys, func, { buffer = event.buf, desc = "LSP: " .. desc })
 					end
-
-					-- Jump to the definition of the word under your cursor.
-					--  This is where a variable was first declared, or where a function is defined, etc.
-					--  To jump back, press <C-t>.
-					map("gd", require("telescope.builtin").lsp_definitions, "[G]oto [D]efinition")
-
-					-- Find references for the word under your cursor.
-					map("gr", require("telescope.builtin").lsp_references, "[G]oto [R]eferences")
-
-					-- Jump to the implementation of the word under your cursor.
-					--  Useful when your language has ways of declaring types without an actual implementation.
-					map("gI", require("telescope.builtin").lsp_implementations, "[G]oto [I]mplementation")
-
-					-- Jump to the type of the word under your cursor.
-					--  Useful when you're not sure what type a variable is and you want to see
-					--  the definition of its *type*, not where it was *defined*.
-					map("<leader>D", require("telescope.builtin").lsp_type_definitions, "Type [D]efinition")
-
-					-- Fuzzy find all the symbols in your current document.
-					--  Symbols are things like variables, functions, types, etc.
-					map("<leader>ds", require("telescope.builtin").lsp_document_symbols, "[D]ocument [S]ymbols")
-
-					-- Fuzzy find all the symbols in your current workspace.
-					--  Similar to document symbols, except searches over your entire project.
-					map(
-						"<leader>ws",
-						require("telescope.builtin").lsp_dynamic_workspace_symbols,
-						"[W]orkspace [S]ymbols"
-					)
 
 					-- Rename the variable under your cursor.
 					--  Most Language Servers support renaming across files, etc.
@@ -513,31 +420,14 @@ require("lazy").setup({
 		keys = {
 			{
 				"<leader>f",
-				function()
-					require("conform").format({ async = true, lsp_format = "fallback" })
-				end,
+				function() require("conform").format({ async = true, lsp_format = "fallback" }) end,
 				mode = "",
 				desc = "[F]ormat buffer",
 			},
 		},
 		opts = {
 			notify_on_error = false,
-			format_on_save = function(bufnr)
-				-- Disable "format_on_save lsp_fallback" for languages that don't
-				-- have a well standardized coding style. You can add additional
-				-- languages here or re-enable it for the disabled ones.
-				local disable_filetypes = { c = true, cpp = true }
-				local lsp_format_opt
-				if disable_filetypes[vim.bo[bufnr].filetype] then
-					lsp_format_opt = "never"
-				else
-					lsp_format_opt = "fallback"
-				end
-				return {
-					timeout_ms = 500,
-					lsp_format = lsp_format_opt,
-				}
-			end,
+			format_on_save = false,
 			formatters_by_ft = {
 				lua = { "stylua" },
 				-- Conform can also run multiple formatters sequentially
@@ -725,8 +615,7 @@ require("lazy").setup({
 				"markdown",
 				"markdown_inline",
 				"query",
-				"vim",
-				"vimdoc",
+        "regex",
 			},
 			-- Autoinstall languages that are not installed
 			auto_install = true,
