@@ -146,7 +146,9 @@ require("lazy").setup {
     priority = 1000,
     lazy = false,
     opts = {
-      picker = {},
+      picker = {
+        layout = { preset = "telescope" }
+      },
       terminal = {},
       notifier = {
         style = "compact",
