@@ -8,7 +8,7 @@ vim.opt.tabstop = 2
 vim.opt.shiftwidth = 2
 vim.opt.softtabstop = 2
 vim.opt.expandtab = true
-vim.opt.foldenable = false
+vim.opt.foldlevelstart = 99
 
 -- Don't show the mode, since it's already in the status line
 vim.opt.showmode = false
