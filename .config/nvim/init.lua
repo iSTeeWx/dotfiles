@@ -188,6 +188,7 @@ require("lazy").setup {
     config = function()
       require("mini.icons").setup()
       require("mini.pairs").setup()
+      require("mini.align").setup()
 
       require("mini.diff").setup({
         view = {
